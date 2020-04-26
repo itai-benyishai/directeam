@@ -17,8 +17,8 @@ aws ec2 create-security-group --group-name Webserver-sg --description "Webserver
 aws ec2 create-security-group --group-name LB-sg --description "LB SG" --vpc-id vpc-dda069a7
 
 # Register Webserver Securitygroup ID (Output of latest command)
-webservers - sg-0ef4c720f620e5a44
-lb - sg-0230bb709caa87108
+# webservers - sg-0ef4c720f620e5a44
+# lb - sg-0230bb709caa87108
 
 
 # Configure rules for security groups
@@ -61,7 +61,6 @@ aws elbv2 create-target-group --name blue --protocol HTTP --port 80 \
 # arn:aws:elasticloadbalancing:us-east-1:730423455918:targetgroup/blue/7813e13d527a2f62
 
 
-
 # Register Targets
 
 # Blue
@@ -82,7 +81,6 @@ aws elbv2 create-listener \
 --default-actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:730423455918:targetgroup/red/3b4094e213a904e9
 
 
-
 # add rules for paths /red and /blue
 # Red
 aws elbv2 create-rule \
@@ -97,15 +95,3 @@ aws elbv2 create-rule \
     --priority 4 \
     --conditions file:///Users/itaibenyishai/directeam/blue-condition.json \
     --actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:730423455918:targetgroup/blue/7813e13d527a2f62
-
-
-
-
-
-
-
-
-
-
-
-
