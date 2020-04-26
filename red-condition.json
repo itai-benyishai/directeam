@@ -2,7 +2,7 @@
     {
         "Field": "path-pattern",
         "PathPatternConfig": {
-            "Values": ["/red"]
+            "Values": ["/red.html"]
         }
     }
 ]
