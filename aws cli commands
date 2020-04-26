@@ -1,0 +1,111 @@
+#!/bin/bash
+#aws cli commands
+
+# Upload nginx.conf to S3 Bucket for blue
+aws s3 cp /Users/itaibenyishai/directeam/nginx.conf s3://directeam-playground-website/blue/nginx.conf
+
+# I edited the nginx.conf file and changed the index for the red.html
+# Upload nginx.conf to S3 Bucket for red (different index)
+aws s3 cp /Users/itaibenyishai/directeam/nginx.conf s3://directeam-playground-website/red/nginx.conf
+
+
+# Import key pair to aws
+aws ec2 import-key-pair --key-name "itais-key" --public-key-material fileb:///Users/itaibenyishai/.ssh/itais-key.pub
+
+# Create Security Groups for webserver and LB
+aws ec2 create-security-group --group-name Webserver-sg --description "Webservers SG" --vpc-id vpc-dda069a7
+aws ec2 create-security-group --group-name LB-sg --description "LB SG" --vpc-id vpc-dda069a7
+
+# Register Webserver Securitygroup ID (Output of latest command)
+webservers - sg-0ef4c720f620e5a44
+lb - sg-0230bb709caa87108
+
+
+# Configure rules for security groups
+# Http from everyone 
+sudo aws ec2 authorize-security-group-ingress --group-id sg-0ef4c720f620e5a44 \
+--protocol tcp --port 80 --cidr 0.0.0.0/0
+
+sudo aws ec2 authorize-security-group-ingress --group-id sg-0230bb709caa87108 \
+--protocol tcp --port 80 --cidr 0.0.0.0/0
+
+# SSH from my ip
+sudo aws ec2 authorize-security-group-ingress --group-id sg-0ef4c720f620e5a44 \
+--protocol tcp --port 22 --cidr 84.108.111.18/24
+
+
+# Create red ec2 instance, connect to subnet in availability zone us-east-1a
+aws ec2 run-instances --image-id ami-0323c3dd2da7fb37d --count 1 --instance-type t2.micro \
+--key-name itais-key --security-group-ids sg-0ef4c720f620e5a44 --subnet-id subnet-9605bcca \
+--user-data file:///Users/itaibenyishai/directeam/blueuserdata.sh
+
+
+# Create blue ec2 instance, connect to suben in availability zone us-east-1b
+aws ec2 run-instances --image-id ami-0323c3dd2da7fb37d --count 1 --instance-type t2.micro \
+--key-name itais-key --security-group-ids sg-0ef4c720f620e5a44 --subnet-id subnet-a4c679c3 \
+--user-data file:///Users/itaibenyishai/directeam/reduserdata.sh
+
+# Create Load Balancer
+aws elbv2 create-load-balancer --name my-load-balancer  \
+--subnets subnet-9605bcca subnet-a4c679c3 --security-groups sg-0230bb709caa87108
+
+# Create Target Groups
+aws elbv2 create-target-group --name red --protocol HTTP --port 80 \
+--vpc-id vpc-dda069a7
+
+# arn:aws:elasticloadbalancing:us-east-1:730423455918:targetgroup/red/3b4094e213a904e9
+
+aws elbv2 create-target-group --name blue --protocol HTTP --port 80 \
+--vpc-id vpc-dda069a7
+
+# arn:aws:elasticloadbalancing:us-east-1:730423455918:targetgroup/blue/7813e13d527a2f62
+
+
+
+# Register Targets
+
+# Blue
+aws elbv2 register-targets \
+--target-group-arn arn:aws:elasticloadbalancing:us-east-1:730423455918:targetgroup/blue/7813e13d527a2f62  \
+--targets Id=i-01a1bd9d37f13ed2e 
+
+# Red
+aws elbv2 register-targets \
+--target-group-arn arn:aws:elasticloadbalancing:us-east-1:730423455918:targetgroup/red/3b4094e213a904e9 \
+--targets Id=i-0fded7ab0cd973724
+
+
+# Create listner with default rule
+aws elbv2 create-listener \
+--load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:730423455918:loadbalancer/app/my-load-balancer/729571d78abb7a33 \
+--protocol HTTP --port 80  \
+--default-actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:730423455918:targetgroup/red/3b4094e213a904e9
+
+
+
+# add rules for paths /red and /blue
+# Red
+aws elbv2 create-rule \
+    --listener-arn arn:aws:elasticloadbalancing:us-east-1:730423455918:listener/app/my-load-balancer/729571d78abb7a33/c28a03fa42e46570   \
+    --priority 5 \
+    --conditions file:///Users/itaibenyishai/directeam/red-condition.json \
+    --actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:730423455918:targetgroup/red/3b4094e213a904e9
+
+# Blue
+aws elbv2 create-rule \
+    --listener-arn arn:aws:elasticloadbalancing:us-east-1:730423455918:listener/app/my-load-balancer/729571d78abb7a33/c28a03fa42e46570  \
+    --priority 4 \
+    --conditions file:///Users/itaibenyishai/directeam/blue-condition.json \
+    --actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:730423455918:targetgroup/blue/7813e13d527a2f62
+
+
+
+
+
+
+
+
+
+
+
+
